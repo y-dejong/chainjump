@@ -33,6 +33,7 @@ const {
     b2Capsule,
     b2CreateWorld,
     b2CreateBody,
+    b2DestroyBody,
     b2CreateCapsuleShape,
     b2CreatePolygonShape,
     b2RevoluteJoint_GetAngle,
@@ -268,6 +269,11 @@ function processMessage(data) {
     } else if (eventType == "c") {
         players[sender] = createPlayer(message);
         console.log("Player created: " + sender);
+    } else if (eventType == "d") {
+        for (const body of players[sender].segments) {
+            b2DestroyBody(body[0]);
+        }
+        delete players[sender];
     }
 };
 

@@ -7,11 +7,13 @@ PORT = 8765
 
 connected_clients = {}  # client_id: websocket
 hub_clients = []      # websocket of the hub
+next_client = 0
 
 async def handle_client(websocket):
-    global hub_clients
+    global hub_clients, next_client
     hub_client = None
-    client_index = len(connected_clients)
+    client_index = next_client
+    next_client += 1
     connected_clients[client_index] = (client_index, websocket)
     print(f"Client connected: {client_index}")
 
@@ -41,6 +43,7 @@ async def handle_client(websocket):
                 await hub_client.send(f"{client_index}:{message}")
 
             elif message[0] in ["r", "R"] and websocket == hub_client: # Answer message or subscription answer
+                print(message)
                 target_id = message[1:message.index(":")]
                 await connected_clients[int(target_id)][1].send(message[message.index(":")+1:])
 
@@ -52,6 +55,9 @@ async def handle_client(websocket):
         if websocket == hub_client:
             print("Hub disconnected.")
             hub_client = None
+        else:
+            if hub_client is not None:
+                await hub_client.send(f"{client_index}:dxxxx")
         del connected_clients[client_index]
 
 
