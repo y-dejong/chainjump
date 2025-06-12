@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Segment and Joint Creator</title>
+  <style>
+    canvas {
+      border: 1px solid #000;
+    }
+    #toolbar {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="modeSegment">Draw Segment</button>
+    <button id="modeJoint">Draw Joint</button>
+    <button id="clear">Clear</button>
+    <pre id="output"></pre>
+  </div>
+  <canvas id="canvas" width="500" height="500"></canvas>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const output = document.getElementById("output");
+    const modeSegmentBtn = document.getElementById("modeSegment");
+    const modeJointBtn = document.getElementById("modeJoint");
+    const clearBtn = document.getElementById("clear");
+
+    const WIDTH = canvas.width;
+    const HEIGHT = canvas.height;
+    const WORLD_SIZE = 10.0;
+
+    let mode = 'segment'; // or 'joint'
+    let segments = [];
+    let joints = [];
+    let tempSegment = [];
+
+    function toCanvasCoords(x, y) {
+      return [x / WORLD_SIZE * WIDTH, HEIGHT - y / WORLD_SIZE * HEIGHT];
+    }
+
+    function toWorldCoords(x, y) {
+      return [x / WIDTH * WORLD_SIZE, (HEIGHT - y) / HEIGHT * WORLD_SIZE];
+    }
+
+    function redraw() {
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      // Draw segments
+      ctx.strokeStyle = 'black';
+	  ctx.lineWidth = 10;
+      segments.forEach(seg => {
+        const [x1, y1] = toCanvasCoords(seg[0], seg[1]);
+        const [x2, y2] = toCanvasCoords(seg[2], seg[3]);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      });
+
+      // Draw joints
+      ctx.fillStyle = 'red';
+      joints.forEach(joint => {
+        const [x, y] = toCanvasCoords(joint[2], joint[3]);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+
+      updateOutput();
+    }
+
+    function updateOutput() {
+      let parts = [];
+      segments.forEach(seg => {
+		let [x1, y1, x2, y2] = seg;
+		let xdiff = Math.min(x1, x2);
+		let ydiff = Math.min(y1, y2);
+		x1 -= xdiff;
+		x2 -= xdiff;
+		y1 -= ydiff;
+		y2 -= ydiff;
+        parts.push(`s${x1.toFixed(2)},${y1.toFixed(2)},${x2.toFixed(2)},${y2.toFixed(2)},${xdiff.toFixed(2)},${ydiff.toFixed(2)}`);
+      });
+      joints.forEach(joint => {
+		let [seg1, seg2, jointX, jointY] = joint;
+		let seg1X = jointX - Math.min(segments[seg1][0], segments[seg1][2]);
+		let seg1Y = jointY - Math.min(segments[seg1][1], segments[seg1][3]);
+		let seg2X = jointX - Math.min(segments[seg2][0], segments[seg2][2]);
+		let seg2Y = jointY - Math.min(segments[seg2][1], segments[seg2][3]);
+        parts.push(`j${seg1},${seg1X.toFixed(2)},${seg1Y.toFixed(2)},${seg2},${seg2X.toFixed(2)},${seg2Y.toFixed(2)}`);
+      });
+      output.textContent = parts.join(';');
+    }
+
+    canvas.addEventListener("click", e => {
+      const rect = canvas.getBoundingClientRect();
+      const [wx, wy] = toWorldCoords(e.clientX - rect.left, e.clientY - rect.top);
+
+      if (mode === 'segment') {
+        tempSegment.push(wx, wy);
+        if (tempSegment.length === 4) {
+          segments.push([...tempSegment]);
+          tempSegment = [];
+          redraw();
+        }
+      } else if (mode === 'joint') {
+        if (segments.length < 2) return alert("Need at least 2 segments to define a joint.");
+        const segment1Index = parseInt(prompt("Enter first segment index (0-based):"), 10);
+        const segment2Index = parseInt(prompt("Enter second segment index (0-based):"), 10);
+        if (isNaN(segment1Index) || isNaN(segment2Index) ||
+            segment1Index < 0 || segment1Index >= segments.length ||
+            segment2Index < 0 || segment2Index >= segments.length) {
+          alert("Invalid segment indices.");
+          return;
+        }
+        joints.push([segment1Index, segment2Index, wx, wy]);
+        redraw();
+      }
+    });
+
+    modeSegmentBtn.onclick = () => { mode = 'segment'; };
+    modeJointBtn.onclick = () => { mode = 'joint'; };
+    clearBtn.onclick = () => {
+      segments = [];
+      joints = [];
+      tempSegment = [];
+      redraw();
+    };
+
+    redraw();
+  </script>
+</body>
+</html>
