@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebSocket Client</title>
+</head>
+<body>
+  <h1>WebSocket Client Running</h1>
+<script>
+  class Chain {
+	constructor(webSocketUrl) {
+      this.ws = new WebSocket(webSocketUrl);
+      this.angle = null;
+
+      this.ws.addEventListener('open', () => {
+		this.ws.send('sangl'); // Subscribe to angle updates
+      });
+
+      this.ws.addEventListener('message', (event) => {
+		const data = event.data;
+		if (data[0] == "R") {
+		  const attr = data.substring(1, 5);
+		  const delimiterIndex = data.indexOf(";");
+		  const params = data.substring(5, delimiterIndex).split(",");
+		  const value = data.substring(delimiterIndex);
+		}
+		if (data.startsWith('angl')) {
+          const value = parseFloat(data.substring(4));
+          if (!isNaN(value)) {
+			this.angle = value;
+          }
+		}
+      });
+	}
+
+	setTorque(value) {
+      this._sendCommand('wtorq', value);
+	}
+
+	setSpeed(value) {
+      this._sendCommand('wsped', value);
+	}
+
+	setEnable(enabled) {
+      const val = enabled ? 't' : 'f';
+      this.ws.send(`wmtre${val}`);
+	}
+
+	_sendCommand(command, value) {
+      const str = `${command}${value}`;
+      this.ws.send(str);
+	}
+
+	getAngle() {
+      return this.angle;
+	}
+  }
+
+  let targetAngle = 0;
+  const Kp = 5; // Proportional gain - adjust for desired speed and stability
+  const maxSpeed = 10; // Maximum speed limit - adjust based on system
+
+  function normalizeAngle(angle) {
+    while (angle > Math.PI) angle -= 2 * Math.PI;
+    while (angle < -Math.PI) angle += 2 * Math.PI;
+    return angle;
+  }
+
+  let chain = new Chain("ws://192.168.0.185:8765");
+
+  function update() {
+    const error = normalizeAngle(targetAngle - chain.angle);
+    const speed = Math.max(-maxSpeed, Math.min(maxSpeed, Kp * error));
+    chain.setSpeed(speed);
+    requestAnimationFrame(update);
+  }
+
+  let angleChanged = false;
+  let increment = 0;
+  const angleStep = 0.02; // Radians per frame when key is held
+
+  // Adjust angle while key is held
+  function handleKeyDown(e) {
+    if (e.repeat) return; // Ignore auto-repeat
+    if (e.key === 'w' || e.key === 'W') increment = angleStep;
+    if (e.key === 's' || e.key === 'S') increment = -angleStep;
+	if (e.key === 'a') targetAngle = 0;
+	if (e.key === 'd') targetAngle = Math.PI;
+  }
+
+  function handleKeyUp(e) {
+    if (e.key === 'w' || e.key === 'W') increment = 0;
+    if (e.key === 's' || e.key === 'S') increment = 0;
+  }
+
+  document.addEventListener('keydown', handleKeyDown);
+  document.addEventListener('keyup', handleKeyUp);
+
+  function controlLoop() {
+    if (increment !== 0) {
+      targetAngle += increment;
+      targetAngle = normalizeAngle(targetAngle);
+      angleChanged = true;
+    }
+
+    if (angleChanged) {
+      angleChanged = false;
+    }
+
+    requestAnimationFrame(controlLoop);
+  }
+
+  controlLoop();
+
+  function normalizeAngle(angle) {
+    while (angle > Math.PI) angle -= 2 * Math.PI;
+    while (angle < -Math.PI) angle += 2 * Math.PI;
+    return angle;
+  }
+</script>
+</body>
+</html>
